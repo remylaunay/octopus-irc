@@ -6,11 +6,12 @@ use Switch;
 use IO::Socket;
 
 sub config {
-	my ( $class, $sid, $nick, $user, $host, $name, $chan, $uid, $sockID ) = @_;
+	my ( $class, $sid, $nick, $user, $host, $name, $chan, $uid, $eaddr, $sockID ) = @_;
+	$eaddr =~ s/\n//gs;
 	$class = ref($class) || $class;
-
 	my $this = {
 	  "sid"    => $sid,
+	  "eaddr" => $eaddr,
 	  "nick"    => $nick,
 	  "user" => $user,
 	  "host"    => $host,
@@ -18,7 +19,7 @@ sub config {
 	  "chan"  => $chan,
 	  "uid"    => $uid,
 	  "sockID" => $sockID,
-	  "mySQL" => DBI->connect("DBI:mysql:database=octopus", "**", "***") 
+	  "mySQL" => DBI->connect("DBI:mysql:database=octopus", "*****", "*******") 
 	};
 	
 	bless ($this, $class);
@@ -29,8 +30,7 @@ sub create {
 	my ( $this ) = @_;
 	my $sockID = $this->{sockID}; 
 	# :000 UID Pseudo HopCount Timestamps User Host UID Servicestamp Usermodes Virtualhost Cloakedhost IpConvertieEnBase64 :Realname
-	print "$this->{uid}";
-	print $sockID ":$this->{sid} UID $this->{nick} 1 ".time()." $this->{user} $this->{host} $this->{uid} 0 +BISqzxwos $this->{host} $this->{host} XN6pyQ== :$this->{name}\r\n";	
+	print $sockID ":$this->{sid} UID $this->{nick} 1 ".time()." $this->{user} $this->{host} $this->{uid} 0 +BISqzxwos $this->{host} $this->{host} $this->{eaddr} :$this->{name}\r\n";	
 	print $sockID ":$this->{uid} JOIN $this->{chan}\r\n";
 }
 
@@ -49,19 +49,32 @@ sub notice {
 sub mode {
  my ( $this, $target, $mode ) = @_;
  my $sockID = $this->{sockID};
- print $sockID ":$this->{sid} MODE ".$target." ".$mode."\r\n";
+ print $sockID ":$this->{uid} MODE ".$target." ".$mode."\r\n";
 };
 
 sub topic {
  my ( $this, $target, $topic ) = @_;
  my $sockID = $this->{sockID};
- print $sockID ":$this->{sid} TOPIC ".$target." ".$topic."\r\n";
+ print $sockID ":$this->{uid} TOPIC ".$target." :".$topic."\r\n";
 };
 
 sub kick {
  my ( $this, $ctarget, $utarget, $reason ) = @_;
  my $sockID = $this->{sockID};
- print $sockID ":$this->{sid} KICK ".$ctarget." ".$utarget." :".$reason."\r\n";
+ if($utarget ne $this->{nick}) {print $sockID ":$this->{uid} KICK ".$ctarget." ".$utarget." :".$reason."\r\n";}
+};
+
+sub kickban {
+ my ( $this, $ctarget, $utarget, $reason, $chost ) = @_;
+ my $sockID = $this->{sockID};
+ print $sockID ":$this->{uid} KICK ".$ctarget." ".$utarget." :".$reason."\r\n";
+ print $sockID ":$this->{uid} MODE ".$ctarget." +b *!*@".$chost."\r\n";
+};
+
+sub kill {
+ my ( $this, $utarget, $reason ) = @_;
+ my $sockID = $this->{sockID};
+ print $sockID ":$this->{uid} KILL ".$utarget." ".$reason."\r\n";
 };
 
 sub join {
@@ -83,15 +96,81 @@ sub checkLevel {
  return $level;
 };
 
-sub setUid{
+sub addChan{
+	my ( $this, $chan ) = @_;
+	my $rq = $this->{mySQL}->prepare("INSERT INTO chanlist VALUES('','".$chan."')");
+	$rq->execute()
+}
+
+sub delChan{
+	my ( $this, $chan ) = @_;
+	my $rq = $this->{mySQL}->prepare("DELETE FROM chanlist WHERE chan = '".$chan."'");
+	$rq->execute()
+}
+
+sub checkChan {
+ my ( $this, $chan ) = @_;
+ $chan = $this->{mySQL}->selectrow_array("SELECT id FROM chanlist WHERE chan = '".$chan."'");
+ return $chan;
+}
+
+sub checkClose {
+ my ( $this, $chan ) = @_;
+ $chan = $this->{mySQL}->selectrow_array("SELECT id FROM closelist WHERE chan = '".$chan."'");
+ return $chan;
+}
+
+sub addClose{
+	my ( $this, $chan, $reason ) = @_;
+	my $rq = $this->{mySQL}->prepare("INSERT INTO closelist VALUES('','".$chan."','".$reason."')");
+	$rq->execute()
+}
+
+sub delClose{
+	my ( $this, $chan ) = @_;
+	my $rq = $this->{mySQL}->prepare("DELETE FROM closelist WHERE chan = '".$chan."'");
+	$rq->execute()
+}
+
+sub setOnline{
+	my ( $this, $nick, $uid, $user, $host, $vhost, $real ) = @_;
+	my $rq = $this->{mySQL}->prepare("INSERT INTO online VALUES('','".$nick."','".$uid."','".$user."','".$host."','".$vhost."','".$real."','')");
+	$rq->execute()
+}
+
+sub updateOnline{
+	my ( $this, $uid, $nick ) = @_;
+	my $rq = $this->{mySQL}->prepare("UPDATE online SET nick = '".$nick."' WHERE uid = '".$uid."'");
+	$rq->execute()
+}
+
+sub setOffline{
+	my ( $this, $uid ) = @_;
+	my $rq = $this->{mySQL}->prepare("DELETE FROM online WHERE uid = '".$uid."'");
+	$rq->execute()
+}
+
+sub setMemberUid{
 	my ( $this, $uid, $arg ) = @_;
 	my $rq = $this->{mySQL}->prepare("UPDATE members SET current_uid = '".$uid."' WHERE login = '".$arg."'");
 	$rq->execute()
 }
 
+sub getNick{
+	my ( $this, $uid ) = @_;
+	my $nick = $this->{mySQL}->selectrow_array("SELECT nick FROM online WHERE uid = '".$uid."'");
+ 	return $nick;
+}
+
+sub getUid{
+	my ( $this, $nick ) = @_;
+	my $uid = $this->{mySQL}->selectrow_array("SELECT uid FROM online WHERE nick = '".$nick."'");
+ 	return $uid;
+}
+
 sub getLogin{
 	my ( $this, $uid ) = @_;
-	my $llogin = $thi->{mySQL}->selectrow_array("SELECT login FROM members WHERE current_uid = '".$uid."'");
+	my $login = $this->{mySQL}->selectrow_array("SELECT login FROM members WHERE current_uid = '".$uid."'");
  	return $login;
 }
 
