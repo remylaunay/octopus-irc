@@ -120,7 +120,7 @@ sub init{
 		        		if($state) {$Octopus->msg($this->{chan},"Deconnection : ".$Octopus->getNick($vuid)."\r\n");}
 						$Octopus->setOffline($vuid);
 						if($isauth{$vuid}) {
-		        			$Octopus->setUid("",$Octopus->getLogin($vuid));
+		        			$Octopus->setMemberUid("",$Octopus->getLogin($vuid));
 		        		}
 		        }
 		        case "SJOIN" {
