@@ -7,8 +7,6 @@
 
 use strict;
 use warnings;
-use Switch;
-use IO::Socket;
 use Service;
 
 our %config;
@@ -38,12 +36,12 @@ $octopus{"CHAN"} = "#Central";
 #NE PAS TOUCHER A CETTE PARTIE#
 ###############################
 
-		  $SIG{HUP} = sub {
-    	  print "got SIGHUP\n";
-    	  delete $INC{"Octopus.pm"};
-    	  delete $INC{"Service.pm"};
-    	  require "Octopus.pm";
-    	  require "Service.pm";
+$SIG{HUP} = sub {
+ 		 print "got SIGHUP\n";
+    		 delete $INC{"Octopus.pm"};
+    		 delete $INC{"Service.pm"};
+    		 require "Octopus.pm";
+    		 require "Service.pm";
   		};
   		
 my $Service = Service->init($link{"SERV"},$link{"PASS"},$link{"ADDR"},$link{"PORT"},$link{"DESC"},$link{"SID"},$octopus{"NICK"},$octopus{"USER"},$octopus{"HOST"},$octopus{"NAME"},$octopus{"CHAN"});
