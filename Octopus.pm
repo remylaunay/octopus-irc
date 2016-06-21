@@ -2,8 +2,8 @@
 package Octopus;
 use strict;
 use warnings;
+use DBI;
 use Switch;
-use IO::Socket;
 
 sub config {
 	my ( $class, $sid, $nick, $user, $host, $name, $chan, $uid, $eaddr, $sockID ) = @_;
