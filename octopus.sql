@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS `chanlist` (
 `id` int(11) NOT NULL,
   `chan` text NOT NULL
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
 
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS `closelist` (
 `id` int(11) NOT NULL,
   `chan` text NOT NULL,
   `reason` text NOT NULL
-) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
 
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS `members` (
   `code` text NOT NULL,
   `level` enum('1','2','3','4','5') NOT NULL,
   `current_uid` text NOT NULL
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
 
@@ -48,7 +48,15 @@ CREATE TABLE IF NOT EXISTS `online` (
   `vhost` text NOT NULL,
   `real` text NOT NULL,
   `start` text NOT NULL
-) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
+
+
+CREATE TABLE IF NOT EXISTS `actions` (
+`id` int(11) NOT NULL,
+  `action` text NOT NULL,
+  `args` longtext NOT NULL
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
+
 
 --
 -- Index pour les tables exportées
@@ -76,4 +84,10 @@ ALTER TABLE `members`
 -- Index pour la table `online`
 --
 ALTER TABLE `online`
+ ADD PRIMARY KEY (`id`);
+
+--
+-- Index pour la table `actions`
+--
+ALTER TABLE `actions`
  ADD PRIMARY KEY (`id`);
