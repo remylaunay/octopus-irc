@@ -32,6 +32,11 @@ sub create {
 	# :000 UID Pseudo HopCount Timestamps User Host UID Servicestamp Usermodes Virtualhost Cloakedhost IpConvertieEnBase64 :Realname
 	print $sockID ":$this->{sid} UID $this->{nick} 1 ".time()." $this->{user} $this->{host} $this->{uid} 0 +BISqzxwos $this->{host} $this->{host} $this->{eaddr} :$this->{name}\r\n";	
 	print $sockID ":$this->{uid} JOIN $this->{chan}\r\n";
+  	my $rq = $this->{mySQL}->prepare("SELECT chan FROM chanlist;");
+	$rq->execute();
+ 	while ( my $data = $rq->fetchrow_hashref ) {
+    	print $sockID ":$this->{uid} JOIN $data->{chan}\r\n";
+  	}
 }
 
 sub msg {
@@ -99,13 +104,15 @@ sub checkLevel {
 sub addChan{
 	my ( $this, $chan ) = @_;
 	my $rq = $this->{mySQL}->prepare("INSERT INTO chanlist VALUES('','".$chan."')");
-	$rq->execute()
+	$rq->execute();
+	$this->join($chan);
 }
 
 sub delChan{
 	my ( $this, $chan ) = @_;
 	my $rq = $this->{mySQL}->prepare("DELETE FROM chanlist WHERE chan = '".$chan."'");
-	$rq->execute()
+	$rq->execute();
+	$this->part($chan);
 }
 
 sub checkChan {
@@ -123,13 +130,16 @@ sub checkClose {
 sub addClose{
 	my ( $this, $chan, $reason ) = @_;
 	my $rq = $this->{mySQL}->prepare("INSERT INTO closelist VALUES('','".$chan."','".$reason."')");
-	$rq->execute()
+	$rq->execute();
+	$this->join($chan);
+	$this->topic($chan,$reason);
 }
 
 sub delClose{
 	my ( $this, $chan ) = @_;
 	my $rq = $this->{mySQL}->prepare("DELETE FROM closelist WHERE chan = '".$chan."'");
-	$rq->execute()
+	$rq->execute();
+	$this->part($chan);
 }
 
 sub setOnline{
@@ -172,6 +182,17 @@ sub getLogin{
 	my ( $this, $uid ) = @_;
 	my $login = $this->{mySQL}->selectrow_array("SELECT login FROM members WHERE current_uid = '".$uid."'");
  	return $login;
+}
+
+sub refreshActions{
+	my ( $this ) = @_;
+	my $rq = $this->{mySQL}->prepare("SELECT * FROM actions;");
+	$rq->execute();
+ 	while ( my $data = $rq->fetchrow_hashref ) {
+    	my $action = $data->{action};
+		my @args = split(/;;00xE;;/, $data->{args});
+    	$this->$action(@args);
+  	}
 }
 
 1;
