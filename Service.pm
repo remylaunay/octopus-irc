@@ -10,7 +10,7 @@ use Octopus;
 
 
 our $version = "2016.06";
-our $build = "201715";
+our $build = "282042";
 our %isauth;
 our %level;
 our %reqbanlist;
@@ -63,6 +63,7 @@ sub init{
 	while (my $event = <$sockID>) {
   		  $SIG{USR1} = sub {
     	  print "got SIGUSR1\n";
+    	  $Octopus->refreshActions();
   		};
 		print "DEBUG : ".$event;
 		my @args = split(/ /, $event);
@@ -90,14 +91,11 @@ sub init{
 		        		$isauth{$args[7]} = 0;
 		        		my $realname = substr $args[13], 1;
 		        		$Octopus->setOnline($args[2],$args[7],$args[5],$args[11],$args[10],$realname);
-		        		if($state) {$Octopus->msg($this->{chan},"Connection : ".$Octopus->getNick($args[7])." (".$ip.")\r\n");}
 
 		        }
 		        case "NICK" {
 		        		# :000AAAAA NICK <newnick> TIMESTAMP
 		        		my $vuid = substr $args[0], 1;
-		        		#Transformer en $Octopus-setnick ? $Octopus->setuid?
-		        		if($state) {$Octopus->msg($this->{chan},"Nick change : ".$Octopus->getNick($vuid)." -> ".$args[2]."\r\n");}
 		        		$Octopus->$Octopus->getUid($args[2]) = $vuid;
 		        		$Octopus->getNick($vuid) = $args[2];
 		        		$chost{$Octopus->getNick($vuid)} = $chost{$vuid};
@@ -117,7 +115,6 @@ sub init{
 		        case "QUIT" {
 		        		# :000AAAAA QUIT :Raison
 		        		my $vuid = substr $args[0], 1;
-		        		if($state) {$Octopus->msg($this->{chan},"Deconnection : ".$Octopus->getNick($vuid)."\r\n");}
 						$Octopus->setOffline($vuid);
 						if($isauth{$vuid}) {
 		        			$Octopus->setMemberUid("",$Octopus->getLogin($vuid));
@@ -129,12 +126,10 @@ sub init{
 		        	   	if($Octopus->checkClose($args[3])){
 						$Octopus->join($args[3]);
 		        		}
-		        		if($state) {$Octopus->msg($this->{chan},"Join : ".$Octopus->getNick($vuid)." -> ".$args[3]."\r\n");}
 		        }                        
 		        case "PART" {
 		        		# :000AAAAA PART #Canal :Raison
 		        		my $vuid = substr $args[0], 1;
-		        		if($state) {$Octopus->msg($this->{chan},"Leave : ".$Octopus->getNick($vuid)." -> ".$args[2]."\r\n");}
 		        }
 		        case "PRIVMSG" {
 		        	# :000AAAAA PRIVMSG Socket :Commande Arguments
@@ -142,7 +137,6 @@ sub init{
 		        	$args = substr $args, 1;
 		        	$vuid = substr $vuid, 1;
 		        	my $nick = $Octopus->getNick($vuid);
-		        	print "MYNICK -> $nick";
 		        	if($state) {
 		        		if(lc($target) eq lc($this->{nick})) {
 		        			&commands($this,$sockID,$Octopus,$vuid,$nick,$args);
@@ -154,13 +148,10 @@ sub init{
 						my $reason = $this->{mySQL}->selectrow_array("SELECT reason FROM closelist WHERE chan = '".$args[3]."'");
 						$Octopus->kick($args[3],$args[7],$reason);
 		        	};
-		        	print "\n UIDD -> ".$Octopus->getUid($args[7]);
 		        	my $login = $this->{mySQL}->selectrow_array("SELECT COUNT(*) FROM members WHERE current_uid = '".$Octopus->getUid($args[7])."'");
-		        	print "LOGIN : ".$login;
 		        	if($login) {
 		        		$isauth{$Octopus->getUid($args[7])}++;
-		        		print "\n ISAUTH OK -->".$Octopus->getUid($args[7])
-		        	;}
+		        	}
 		        }
 		        case "367" {
 		        	$Octopus->notice($reqbanlist{$args[3]},$args[4]);
@@ -328,14 +319,14 @@ sub commands {
 		case "addchan" {
 			my ($target) = ($args =~ /([#])(\S+)/);
 	    	if(!defined($target)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} ADDCHAN <#canal>");return}
-	    	$Octopus->addChan($target);
-	    	$Octopus->join($target);
+	    	$Octopus->addChan($args);
+	    	#$Octopus->join($args);
 		}
 		case "delchan" {
 			my ($target) = ($args =~ /([#])(\S+)/);
 	    	if(!defined($target)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} DELCHAN <#canal>");return}
-	    	$Octopus->delChan($target);
-	    	$Octopus->part($target);
+	    	$Octopus->delChan($args);
+	    	#$Octopus->part($args);
 		}
 		case "chanclose" {
 			my ($target,$reason) = ($args =~ /([#]\S+)\s*(.*)/);
@@ -343,8 +334,6 @@ sub commands {
 	    	if($Octopus->checkClose($target)){$Octopus->notice($nick,"Erreur : ce salon est déjà dans liste noire");return}
 	    	if($Octopus->checkChan($target)){$Octopus->notice($nick,"Erreur : ce salon est un salon enregistré");return}
 	    	$Octopus->addClose($target,$reason);
-	    	$Octopus->join($target);
-	    	$Octopus->topic($target,$reason);
 		}		
 		case "say" {
 			my ($target,$message) = ($args =~ /(\S+)\s*(.*)/);
@@ -403,4 +392,4 @@ sub commands {
 	}
 };
 
-	1;
+1;
