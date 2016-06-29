@@ -9,122 +9,97 @@ use IO::Socket;
 use Octopus;
 
 
-our $version = "2016.06";
-our $build = "282042";
-our %isauth;
-our %level;
-our %reqbanlist;
-our %chost;
-
+our $_version = "2016.06";
+our %_isauth;
+our %_reqbanlist;
+our %_chost;
+our ( $_botuid, $_serv, $_pass, $_addr, $_port, $_desc, $_sid, $_botnick, $_botuser, $_bothost, $_botname, $_botchan, $_sqlhost, $_sqlport, $_sqllogin, $_sqlpass, $_sqldb,  $_mySQL );
 
 # Initialisation #
 sub init{
-	my ( $class, $serv, $pass, $addr, $port, $desc, $sid, $nick, $user, $host, $name, $chan ) = @_;
-	$class = ref($class) || $class;
-	my $ip = inet_ntoa(inet_aton($addr));
-	my $this = {
-		"serv"    => $serv,
-		"pass"    => $pass,
-		"addr" => $addr,
-		"eaddr" => `ruby base64 $ip`,
-		"port"    => $port,
-		"desc"    => $desc,
-		"sid"  => $sid,
-		"nick"    => $nick,
-		"user" => $user,
-		"host"    => $host,
-		"name"    => $name,
-		"chan"  => $chan,
-		"uid"    => $sid."AAAA01",	 	  
-		"mySQL" => DBI->connect("DBI:mysql:database=octopus", "*****", "**********")
-	};
-	
-	bless ($this, $class);
-
-	our $state = 0;
+	our ( $_class, $_serv, $_pass, $_addr, $_port, $_desc, $_sid, $_botnick, $_botuser, $_bothost, $_botname, $_botchan, $_sqlhost, $_sqlport, $_sqllogin, $_sqlpass, $_sqldb ) = @_;
+	our $_ip = inet_ntoa(inet_aton($_addr));
+	our $_state = 0;
+	our $_eaddr = `ruby base64 $_ip`;
 	# Création de la socket, connexion au serveur distant #
-	our $sockID = IO::Socket::INET->new(proto => 'tcp',
-	                                   PeerAddr => $this->{addr},
-	                                   PeerPort => $this->{port},
+	our $_sockID = IO::Socket::INET->new(proto => 'tcp',
+	                                   PeerAddr => $_addr,
+	                                   PeerPort => $_port,
 	                                  ) or die "Erreur de connexion\r\n";
 
-	our $Octopus = Octopus->config($this->{sid},$this->{nick},$this->{user},$this->{host},$this->{name},$this->{chan},$this->{uid},$this->{eaddr},$sockID);
-
-	# Procédure de Link #
-	print $sockID "PASS :$this->{pass}\r\n";
-	print $sockID "PROTOCTL EAUTH=octopus.khalia-dev.fr SID=$this->{sid}\r\n";
-	print $sockID "PROTOCTL NOQUIT NICKv2 SJOIN SJ3 CLK TKLEXT TKLEXT2 NICKIP ESVID MLOCK EXTSWHOIS\r\n";
-	print $sockID "SERVER $this->{serv} 1 :$this->{desc}\r\n";
-	#EOS -> Fin de la synchronisation
-	print $sockID ":$this->{sid} EOS\r\n";
-	$Octopus->create();
 	
-	# Traitement des évènements #
-	while (my $event = <$sockID>) {
+	my @_letters=('A'..'Z');
+	my @_figures=('0'..'9');
+	$_botuid .= $_letters[rand($#_letters)] for (1..4);
+	$_botuid .= $_figures[rand($#_figures)] for (1..2);
+
+	our $_botuid = $_sid.$_botuid;
+	our $_mySQL = DBI->connect("DBI:mysql:database=$_sqldb;host=$_sqlhost;port=$_sqlport", $_sqllogin, $_sqlpass);
+	our $_Octopus = Octopus->config();
+
+	print $_sockID "PASS :$_pass\r\n";
+	print $_sockID "PROTOCTL EAUTH=octopus.khalia-dev.fr SID=$_sid\r\n";
+	print $_sockID "PROTOCTL NOQUIT NICKv2 SJOIN SJ3 CLK TKLEXT TKLEXT2 NICKIP ESVID MLOCK EXTSWHOIS\r\n";
+	print $_sockID "SERVER $_serv 1 :$_desc\r\n";
+	print $_sockID ":$_sid EOS\r\n";
+	$_Octopus->create();
+
+	while (my $event = <$_sockID>) {
   		  $SIG{USR1} = sub {
     	  print "got SIGUSR1\n";
-    	  $Octopus->refreshActions();
+    	  $_Octopus->refreshActions();
   		};
 		print "DEBUG : ".$event;
 		my @args = split(/ /, $event);
 		switch($args[0]) {
 		        case "PING" {
-		                print $sockID "PONG ".time()."\r\n";
+		                print $_sockID "PONG ".time()."\r\n";
 		        }
 		        case "NETINFO" {
-		                $state = 1;
+		        	$_state = 1;
 		        }                          
 		}
 		switch($args[1]) {                    
 		        case "UID" {
 		        		# :000 UID Pseudo HopCount Timestamps User Host UID Servicestamp Usermodes Virtualhost Cloakedhost IpConvertieEnBase64 :Realname
-		        		# On retrouve l'adresse IP de l'utilisateur (parfois, seul le nom d'hôte est communiqué)
 		        		my $ip = inet_ntoa(inet_aton($args[6]));
-		        		#L'UID de Machin est 000AAAAA
-		        		#$Octopus->$Octopus->getUid($args[2]) = $args[7];
-		        		#
-						#Le pseudo de 000AAAAA est Machin
-		        		#$Octopus->getNick{$args[7]} = $args[2];
-		        		#$chost{$args[7]} = $args[11];	
-		        		#$chost{$args[2]} = $args[11];
-		        		#L'utilisateur vient de se connecter, on déclare qu'il n'est pas identifié au service
-		        		$isauth{$args[7]} = 0;
+		        		$_isauth{$args[7]} = 0;
 		        		my $realname = substr $args[13], 1;
-		        		$Octopus->setOnline($args[2],$args[7],$args[5],$args[11],$args[10],$realname);
+		        		$_Octopus->setOnline($args[2],$args[7],$args[5],$args[11],$args[10],$realname);
 
 		        }
 		        case "NICK" {
 		        		# :000AAAAA NICK <newnick> TIMESTAMP
 		        		my $vuid = substr $args[0], 1;
-		        		$Octopus->$Octopus->getUid($args[2]) = $vuid;
-		        		$Octopus->getNick($vuid) = $args[2];
-		        		$chost{$Octopus->getNick($vuid)} = $chost{$vuid};
-		        		$Octopus->updateOnline($vuid,$args[2]);
+		        		$_Octopus->getUid($args[2]) = $vuid;
+		        		$_Octopus->getNick($vuid) = $args[2];
+		        		$_chost{$_Octopus->getNick($vuid)} = $_chost{$vuid};
+		        		$_Octopus->updateOnline($vuid,$args[2]);
 		        }
 		        case "CHGHOST" {
 		        		# :nick CHGHOST <nick> <vhost>
-		        		$chost{$args[2]} = $args[3];
-		        		$chost{$Octopus->$Octopus->getUid($args[2])} = $args[3];
+		        		$_chost{$args[2]} = $args[3];
+		        		$_chost{$_Octopus->$_Octopus->getUid($args[2])} = $args[3];
 		        }
 		        case "SETHOST" {
 		        		# :nick SETHOST <vhost>
 		        		my $nick = substr $args[0], 1;
-		        		$chost{$nick} = $args[2];
-		        		$chost{$Octopus->getUid($nick)} = $args[2];
+		        		$_chost{$nick} = $args[2];
+		        		$_chost{$_Octopus->getUid($nick)} = $args[2];
 		        }		        		        
 		        case "QUIT" {
 		        		# :000AAAAA QUIT :Raison
 		        		my $vuid = substr $args[0], 1;
-						$Octopus->setOffline($vuid);
-						if($isauth{$vuid}) {
-		        			$Octopus->setMemberUid("",$Octopus->getLogin($vuid));
+						$_Octopus->setOffline($vuid);
+						if($_isauth{$vuid}) {
+		        			$_Octopus->setMemberUid("",$_Octopus->getLogin($vuid));
 		        		}
 		        }
 		        case "SJOIN" {
 		        		# :000 SJOIN TIMESTAMP #Canal :UID
 		        		my $vuid = substr $args[4], -9;
-		        	   	if($Octopus->checkClose($args[3])){
-						$Octopus->join($args[3]);
+		        	   	if($_Octopus->checkClose($args[3])){
+						$_Octopus->join($args[3]);
 		        		}
 		        }                        
 		        case "PART" {
@@ -136,35 +111,36 @@ sub init{
 		        	my ( $vuid, $cmd, $target, $args ) = split ( / /, $event, 4 );
 		        	$args = substr $args, 1;
 		        	$vuid = substr $vuid, 1;
-		        	my $nick = $Octopus->getNick($vuid);
-		        	if($state) {
-		        		if(lc($target) eq lc($this->{nick})) {
-		        			&commands($this,$sockID,$Octopus,$vuid,$nick,$args);
+		        	my $nick = $_Octopus->getNick($vuid);
+		        	if($_state) {
+		        		if(lc($target) eq lc($_botnick)) {
+		        			&commands($_sockID,$_Octopus,$vuid,$nick,$args);
 		        		}
 		        	}
 		        }
 		        case "352" {
-		        	if($Octopus->checkClose($args[3])){
-						my $reason = $this->{mySQL}->selectrow_array("SELECT reason FROM closelist WHERE chan = '".$args[3]."'");
-						$Octopus->kick($args[3],$args[7],$reason);
+		        	if($_Octopus->checkClose($args[3])){
+						my $reason = $_mySQL->selectrow_array("SELECT reason FROM closelist WHERE chan = '".$args[3]."'");
+						$_Octopus->kick($args[3],$args[7],$reason);
 		        	};
-		        	my $login = $this->{mySQL}->selectrow_array("SELECT COUNT(*) FROM members WHERE current_uid = '".$Octopus->getUid($args[7])."'");
+		        	my $login = $_mySQL->selectrow_array("SELECT COUNT(*) FROM members WHERE current_uid = '".$_Octopus->getUid($args[7])."'");
 		        	if($login) {
-		        		$isauth{$Octopus->getUid($args[7])}++;
+		        		$_isauth{$_Octopus->getUid($args[7])}++;
 		        	}
 		        }
 		        case "367" {
-		        	$Octopus->notice($reqbanlist{$args[3]},$args[4]);
+		        	$_Octopus->notice($_reqbanlist{$args[3]},$args[4]);
 		        }
 		        case "368" {
-		        	$Octopus->notice($reqbanlist{$args[3]},"Fin de la liste");
-		        	undef $reqbanlist{$args[3]};
+		        	$_Octopus->notice($_reqbanlist{$args[3]},"Fin de la liste");
+		        	undef $_reqbanlist{$args[3]};
 		        }
 		    }
 		}
 	};
+
 sub commands {
-	my ($this, $sockID, $Octopus, $uid, $nick, $args) = @_;
+	my ($_sockID, $_Octopus, $uid, $nick, $args) = @_;
 	my $vdata = $args;
 	my ($command) = ($vdata =~ m/\b(\w+)\b/);
 	$args=~ s/^\S+\s*//;
@@ -174,222 +150,221 @@ sub commands {
 	print "ARGS : $args\n";
    	switch(lc($command)) {
 		case "help" {
-	    	$Octopus->notice($nick,"---------- 6Octopus IRC Service ----------");
-	    	$Octopus->notice($nick," ");
-	    	$Octopus->notice($nick,"3[Commandes3]");
-	    	$Octopus->notice($nick,"help - contact - version - auth");
-	    	$Octopus->notice($nick," ");
-	    	if($Octopus->checkLevel($uid) >= 1) {
-		    	$Octopus->notice($nick,"3[Canaux3]");
-		    	$Octopus->notice($nick,"mode - kick - ban - kickban - topic - banlist");
-		    	$Octopus->notice($nick," ");
+	    	$_Octopus->notice($nick,"---------- 6Octopus IRC Service ----------");
+	    	$_Octopus->notice($nick," ");
+	    	$_Octopus->notice($nick,"3[Commandes3]");
+	    	$_Octopus->notice($nick,"help - contact - version - auth");
+	    	$_Octopus->notice($nick," ");
+	    	if($_Octopus->checkLevel($uid) >= 1) {
+		    	$_Octopus->notice($nick,"3[Canaux3]");
+		    	$_Octopus->notice($nick,"mode - kick - ban - kickban - topic - banlist");
+		    	$_Octopus->notice($nick," ");
 	    	}
-	    	if($Octopus->checkLevel($uid) >= 2) {
-		    	$Octopus->notice($nick,"3[Serveur3]");
-		    	$Octopus->notice($nick,"kill - zline - gline - kline - glinelist");
-		    	$Octopus->notice($nick,"chanclose - delchanclose - klinelist - zlinelist");
-		    	$Octopus->notice($nick," ");
+	    	if($_Octopus->checkLevel($uid) >= 2) {
+		    	$_Octopus->notice($nick,"3[Serveur3]");
+		    	$_Octopus->notice($nick,"kill - zline - gline - kline - glinelist");
+		    	$_Octopus->notice($nick,"chanclose - delchanclose - klinelist - zlinelist");
+		    	$_Octopus->notice($nick," ");
 	    	}
-	    	if($Octopus->checkLevel($uid) >= 3) {	    	
-		    	$Octopus->notice($nick,"3[Sécurité3]");
-		    	$Octopus->notice($nick,"join - part - addchan - delchan");
-		    	$Octopus->notice($nick," ");
+	    	if($_Octopus->checkLevel($uid) >= 3) {	    	
+		    	$_Octopus->notice($nick,"3[Sécurité3]");
+		    	$_Octopus->notice($nick,"join - part - addchan - delchan");
+		    	$_Octopus->notice($nick," ");
 		    }
-		   	if($Octopus->checkLevel($uid) >= 4) {
-		    	$Octopus->notice($nick,"3[Gestion des accès3]");
-		    	$Octopus->notice($nick,"adduser - deluser - suspenduser");
-		    	$Octopus->notice($nick," ");
+		   	if($_Octopus->checkLevel($uid) >= 4) {
+		    	$_Octopus->notice($nick,"3[Gestion des accès3]");
+		    	$_Octopus->notice($nick,"adduser - deluser - suspenduser");
+		    	$_Octopus->notice($nick," ");
 	    	}
-	    	if($Octopus->checkLevel($uid) >= 5) {
-		    	$Octopus->notice($nick,"3[Administration3]");
-		    	$Octopus->notice($nick,"join - part - addchan - delchan");
-		    	$Octopus->notice($nick," ");
+	    	if($_Octopus->checkLevel($uid) >= 5) {
+		    	$_Octopus->notice($nick,"3[Administration3]");
+		    	$_Octopus->notice($nick,"join - part - addchan - delchan");
+		    	$_Octopus->notice($nick," ");
 		    }
-			$Octopus->notice($nick,"---------- 6Octopus IRC Service ----------");
+			$_Octopus->notice($nick,"---------- 6Octopus IRC Service ----------");
 		}
 		case "version"{
-			$Octopus->notice($nick,"Octopus IRC Service - Version 2016.06 - Rémy Launay <remylaunay\@gmail.com> - http://www.khalia-dev.fr");
+			$_Octopus->notice($nick,"Octopus IRC Service - Version 2016.06 - Rémy Launay <remylaunay\@gmail.com> - http://www.khalia-dev.fr");
 		}
 		case "contact"{
 			#Messagerie SQL user -> admin (Mémo?)
-			$Octopus->notice($nick,"Octopus IRC Service - Version 2016.06 - Rémy Launay <remylaunay\@gmail.com> - http://www.khalia-dev.fr");
+			$_Octopus->notice($nick,"Octopus IRC Service - Version 2016.06 - Rémy Launay <remylaunay\@gmail.com> - http://www.khalia-dev.fr");
 		}
 		case "mode" {
 			my ($target,$mode) = ($args =~ /([#]\S+)\s*(.*)/);
-			if(!defined($target) || !defined($mode) || $mode eq "") {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} MODE <canal> <mode(s)>");return}
+			if(!defined($target) || !defined($mode) || $mode eq "") {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} MODE <canal> <mode(s)>");return}
 			print "MODEE -> ".$mode;
-			$Octopus->mode($target,$mode);
+			$_Octopus->mode($target,$mode);
 		}
 		case "voice" {
 			my ($target,$nicks) = ($args =~ /([#]\S+)\s*(.*)/);
-			if(!defined($target) || !defined($nicks)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} VOICE <canal> <pseudo(s)>");return}
-			if($nicks eq "") {$Octopus->mode($target,"+v ".$nick);}
-			$Octopus->mode($target,"+vvvvvvvvv ".$nicks);
+			if(!defined($target) || !defined($nicks)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} VOICE <canal> <pseudo(s)>");return}
+			if($nicks eq "") {$_Octopus->mode($target,"+v ".$nick);}
+			$_Octopus->mode($target,"+vvvvvvvvv ".$nicks);
 		}
 		case "devoice" {
 			my ($target,$nicks) = ($args =~ /([#]\S+)\s*(.*)/);
-			if(!defined($target) || !defined($nicks)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} DEVOICE <canal> <pseudo(s)>");return}
-			if($nicks eq "") {$Octopus->mode($target,"-v ".$nick);}
-			$Octopus->mode($target,"-vvvvvvvvvv ".$nicks);
+			if(!defined($target) || !defined($nicks)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} DEVOICE <canal> <pseudo(s)>");return}
+			if($nicks eq "") {$_Octopus->mode($target,"-v ".$nick);}
+			$_Octopus->mode($target,"-vvvvvvvvvv ".$nicks);
 		}		
 		case "halfop" {
 			my ($target,$nicks) = ($args =~ /([#]\S+)\s*(.*)/);
-			if(!defined($target) || !defined($nicks)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} HALFOP <canal> <pseudo(s)>");return}
-			if($nicks eq "") {$Octopus->mode($target,"+h ".$nick);}
-			$Octopus->mode($target,"+hhhhhhhhhh ".$nicks);
+			if(!defined($target) || !defined($nicks)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} HALFOP <canal> <pseudo(s)>");return}
+			if($nicks eq "") {$_Octopus->mode($target,"+h ".$nick);}
+			$_Octopus->mode($target,"+hhhhhhhhhh ".$nicks);
 		}		
 		case "dehalfop" {
 			my ($target,$nicks) = ($args =~ /([#]\S+)\s*(.*)/);
-			if(!defined($target) || !defined($nicks)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} DEHALFOP <canal> <pseudo(s)>");return}
-			if($nicks eq "") {$Octopus->mode($target,"-h ".$nick);}
-			$Octopus->mode($target,"-hhhhhhhhhh ".$nicks);
+			if(!defined($target) || !defined($nicks)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} DEHALFOP <canal> <pseudo(s)>");return}
+			if($nicks eq "") {$_Octopus->mode($target,"-h ".$nick);}
+			$_Octopus->mode($target,"-hhhhhhhhhh ".$nicks);
 		}		
 		case "op" {
 			my ($target,$nicks) = ($args =~ /([#]\S+)\s*(.*)/);
-			if(!defined($target) || !defined($nicks)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} OP <canal> <pseudo(s)>");return}
-			if($nicks eq "") {$Octopus->mode($target,"+o ".$nick);}
-			$Octopus->mode($target,"+oooooooooo ".$nicks);
+			if(!defined($target) || !defined($nicks)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} OP <canal> <pseudo(s)>");return}
+			if($nicks eq "") {$_Octopus->mode($target,"+o ".$nick);}
+			$_Octopus->mode($target,"+oooooooooo ".$nicks);
 		}		
 		case "deop" {
 			my ($target,$nicks) = ($args =~ /([#]\S+)\s*(.*)/);
-			if(!defined($target) || !defined($nicks)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} DEOP <canal> <pseudo(s)>");return}
-			$Octopus->mode($target,"-oooooooooo ".$nicks);
-			if($nicks eq "") {$Octopus->mode($target,"-o ".$nick);}
+			if(!defined($target) || !defined($nicks)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} DEOP <canal> <pseudo(s)>");return}
+			$_Octopus->mode($target,"-oooooooooo ".$nicks);
+			if($nicks eq "") {$_Octopus->mode($target,"-o ".$nick);}
 		}		
 		case "protect" {
 			my ($target,$nicks) = ($args =~ /([#]\S+)\s*(.*)/);
-			if(!defined($target) || !defined($nicks)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} PROTECT <canal> <pseudo(s)>");return}
-			if($nicks eq "") {$Octopus->mode($target,"+a ".$nick);}
-			$Octopus->mode($target,"+aaaaaaaaaa ".$nicks);
+			if(!defined($target) || !defined($nicks)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} PROTECT <canal> <pseudo(s)>");return}
+			if($nicks eq "") {$_Octopus->mode($target,"+a ".$nick);}
+			$_Octopus->mode($target,"+aaaaaaaaaa ".$nicks);
 		}		
 		case "deprotect" {
 			my ($target,$nicks) = ($args =~ /([#]\S+)\s*(.*)/);
-			if(!defined($target) || !defined($nicks)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} DEPROTECT <canal> <pseudo(s)>");return}
-			if($nicks eq "") {$Octopus->mode($target,"-a ".$nick);}
-			$Octopus->mode($target,"-aaaaaaaaaa ".$nicks);
+			if(!defined($target) || !defined($nicks)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} DEPROTECT <canal> <pseudo(s)>");return}
+			if($nicks eq "") {$_Octopus->mode($target,"-a ".$nick);}
+			$_Octopus->mode($target,"-aaaaaaaaaa ".$nicks);
 		}		
 		case "owner" {
 			my ($target,$nicks) = ($args =~ /([#]\S+)\s*(.*)/);
-			if(!defined($target) || !defined($nicks)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} OWNER <canal> <pseudo(s)>");return}
-			if($nicks eq "") {$Octopus->mode($target,"+q ".$nick);}
-			$Octopus->mode($target,"+qqqqqqqqq ".$nicks);
+			if(!defined($target) || !defined($nicks)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} OWNER <canal> <pseudo(s)>");return}
+			if($nicks eq "") {$_Octopus->mode($target,"+q ".$nick);}
+			$_Octopus->mode($target,"+qqqqqqqqq ".$nicks);
 		}		
 		case "deowner" {
 			my ($target,$nicks) = ($args =~ /([#]\S+)\s*(.*)/);
-			if(!defined($target) || !defined($nicks)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} DEOWNER <canal> <pseudo(s)>");return}
-			if($nicks eq "") {$Octopus->mode($target,"-q ".$nick);}
-			$Octopus->mode($target,"-qqqqqqqqq ".$nicks);
+			if(!defined($target) || !defined($nicks)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} DEOWNER <canal> <pseudo(s)>");return}
+			if($nicks eq "") {$_Octopus->mode($target,"-q ".$nick);}
+			$_Octopus->mode($target,"-qqqqqqqqq ".$nicks);
 		}				
 		case "ban" {
 			my ($target,$mode) = ($args =~ /([#]\S+)\s+(.+)!(.+)+@(.+)/);
-			if(!defined($target) || !defined($mode)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} BAN <canal> <nick!user\@host>");return}
-			$Octopus->mode($target,"+b ".$mode);
+			if(!defined($target) || !defined($mode)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} BAN <canal> <nick!user\@host>");return}
+			$_Octopus->mode($target,"+b ".$mode);
 		}
 		case "unban" {
 			my ($target,$mode) = ($args =~ /([#]\S+)\s+(.+)!(.+)+@(.+)/);
-			if(!defined($target) || !defined($mode)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} UNBAN <canal> <nick!user\@host>");return}
-			$Octopus->mode($target,"-b ".$mode);
+			if(!defined($target) || !defined($mode)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} UNBAN <canal> <nick!user\@host>");return}
+			$_Octopus->mode($target,"-b ".$mode);
 		}
 		case "kick" {								   
 			my ($ctarget,$utarget,$reason) = ($args =~ /([#]\S+)\s+(\S+)\s*(.*)/);
-			if(!defined($ctarget) || !defined($utarget)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} KICK <canal> <cible> (<raison>)");return}			
-			$Octopus->kick($ctarget,$utarget,$reason);
+			if(!defined($ctarget) || !defined($utarget)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} KICK <canal> <cible> (<raison>)");return}			
+			$_Octopus->kick($ctarget,$utarget,$reason);
 		}
 		case "kickban" {								   
 			my ($ctarget,$utarget,$reason) = ($args =~ /([#]\S+)\s+(\S+)\s*(.*)/);
-			if(!defined($ctarget) || !defined($utarget)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} KICKBAN <canal> <cible> (<raison>)");return}			
-			$Octopus->kickban($ctarget,$utarget,$reason,$chost{$utarget});
+			if(!defined($ctarget) || !defined($utarget)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} KICKBAN <canal> <cible> (<raison>)");return}			
+			$_Octopus->kickban($ctarget,$utarget,$reason,$_chost{$utarget});
 		}		
 		case "banlist" {								   
 			my ($target) = ($args =~ /([#]\S+)/);
-			if(!defined($target)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} BANLIST <#canal>");return}			
-			$reqbanlist{$target} = $uid;
-			$Octopus->mode($target,"+b");	    				
+			if(!defined($target)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} BANLIST <#canal>");return}			
+			$_reqbanlist{$target} = $uid;
+			$_Octopus->mode($target,"+b");	    				
 		}			
 		case "join" {
 			my ($target) = ($args =~ /([#])(\S+)/);
-	    	if(!defined($target)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} JOIN <#canal>");return}
-	    	$Octopus->join($args);
+	    	if(!defined($target)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} JOIN <#canal>");return}
+	    	$_Octopus->join($args);
 		}
 		case "part" {
 			my ($target) = ($args =~ /([#])(\S+)/);
-	    	if(!defined($target)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} PART <#canal>");return}
-	    	$Octopus->part($args);
+	    	if(!defined($target)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} PART <#canal>");return}
+	    	$_Octopus->part($args);
 		}
 		case "addchan" {
 			my ($target) = ($args =~ /([#])(\S+)/);
-	    	if(!defined($target)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} ADDCHAN <#canal>");return}
-	    	$Octopus->addChan($args);
-	    	#$Octopus->join($args);
+	    	if(!defined($target)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} ADDCHAN <#canal>");return}
+	    	$_Octopus->addChan($args);
+	    	#$_Octopus->join($args);
 		}
 		case "delchan" {
 			my ($target) = ($args =~ /([#])(\S+)/);
-	    	if(!defined($target)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} DELCHAN <#canal>");return}
-	    	$Octopus->delChan($args);
-	    	#$Octopus->part($args);
+	    	if(!defined($target)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} DELCHAN <#canal>");return}
+	    	$_Octopus->delChan($args);
+	    	#$_Octopus->part($args);
 		}
 		case "chanclose" {
 			my ($target,$reason) = ($args =~ /([#]\S+)\s*(.*)/);
-	    	if(!defined($target)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} CHANCLOSE <#canal>");return}
-	    	if($Octopus->checkClose($target)){$Octopus->notice($nick,"Erreur : ce salon est déjà dans liste noire");return}
-	    	if($Octopus->checkChan($target)){$Octopus->notice($nick,"Erreur : ce salon est un salon enregistré");return}
-	    	$Octopus->addClose($target,$reason);
+	    	if(!defined($target)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} CHANCLOSE <#canal>");return}
+	    	if($_Octopus->checkClose($target)){$_Octopus->notice($nick,"Erreur : ce salon est déjà dans liste noire");return}
+	    	if($_Octopus->checkChan($target)){$_Octopus->notice($nick,"Erreur : ce salon est un salon enregistré");return}
+	    	$_Octopus->addClose($target,$reason);
 		}		
 		case "say" {
 			my ($target,$message) = ($args =~ /(\S+)\s*(.*)/);
-			if(!defined($target) || !defined($message)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} SAY <canal> <message>");return}
-			$Octopus->msg($target,$message);
+			if(!defined($target) || !defined($message)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} SAY <canal> <message>");return}
+			$_Octopus->msg($target,$message);
 		}
 		case "auth" {
 			my ($login,$code) = ($args =~ /^(\S+)\s+(\S+)/);
-			if(!defined($login) || !defined($code)) {$Octopus->notice($nick,"Erreur de syntaxe : /msg $this->{nick} AUTH <identifiant> <code>");return}
-			my $isuser = $this->{mySQL}->selectrow_array("SELECT COUNT(*) FROM members WHERE login = '".$login."' AND code = '".sha1_hex($code)."'");
-			if($isauth{$uid}) {$Octopus->notice($nick,"Erreur : vous êtes déjà identifié");return}
+			if(!defined($login) || !defined($code)) {$_Octopus->notice($nick,"Erreur de syntaxe : /msg $_Octopus->{nick} AUTH <identifiant> <code>");return}
+			my $isuser = $_mySQL->selectrow_array("SELECT COUNT(*) FROM members WHERE login = '".$login."' AND code = '".sha1_hex($code)."'");
+			if($_isauth{$uid}) {$_Octopus->notice($nick,"Erreur : vous êtes déjà identifié");return}
 			if(!$isuser){
-				$Octopus->notice($nick,"Erreur : identifiant et/ou code incorrect(s)");
-				$Octopus->msg($this->{chan},"AUTH : ".$nick." -> refusé");
+				$_Octopus->notice($nick,"Erreur : identifiant et/ou code incorrect(s)");
+				$_Octopus->msg($_botchan,"AUTH : ".$nick." -> refusé");
 				return;				
 			} else {
-				$isauth{$uid} = 1;
-				$Octopus->setMemberUid($uid,$login);
-				$Octopus->notice($nick,"AUTH : identification réussie");
-				$Octopus->msg($this->{chan},"AUTH : ".$nick." -> autorisé");				
+				$_isauth{$uid} = 1;
+				$_Octopus->setMemberUid($uid,$login);
+				$_Octopus->notice($nick,"AUTH : identification réussie");
+				$_Octopus->msg($_botchan,"AUTH : ".$nick." -> autorisé");				
 			}
 		}
 		case "do" {
 			my ($target,$message) = ($args =~ /(\S+)\s*(.*)/);
-					  print $sockID ":$this->{sid} ".$message."\r\n";
+					  print $_sockID ":$_sid ".$message."\r\n";
 		}		
 		case "reload"{
 		  
-		  $Octopus->notice($nick,"RELOAD : ".$nick." -> rechargement en cours...");	
-		  $Octopus->msg($this->{chan},"RELOAD : ".$nick." -> rechargement en cours...");	
-		  print $sockID ":$this->{uid} WHO *\r\n";
+		  $_Octopus->notice($nick,"RELOAD : ".$nick." -> rechargement en cours...");	
+		  $_Octopus->msg($_botchan,"RELOAD : ".$nick." -> rechargement en cours...");	
+		  print $_sockID ":$_botuid WHO *\r\n";
 		  sleep(1);
-		  $Octopus->msg($this->{chan},"================ Octopus IRC Service ================");	
-		  $Octopus->msg($this->{chan},"");
-		  $Octopus->msg($this->{chan},"- > Redéfinition des fonctions");	
+		  $_Octopus->msg($_botchan,"================ Octopus IRC Service ================");	
+		  $_Octopus->msg($_botchan,"");
+		  $_Octopus->msg($_botchan,"- > Redéfinition des fonctions");	
 		  print "Reloading configuration...\n";
     	  delete $INC{"Octopus.pm"};
     	  delete $INC{"Service.pm"};
     	  require "Octopus.pm";
     	  require "Service.pm";
-    	  $isauth{$uid} = 0;
-		  $Octopus->msg($this->{chan},"- > Redéfinition des utilisateurs");	
-		  $Octopus->msg($this->{chan},"- > Version du service : ".$version);	
-		  $Octopus->msg($this->{chan},"- > Build du service : ".$build);	
-		  $Octopus->msg($this->{chan},"");
+    	  $_isauth{$uid} = 0;
+		  $_Octopus->msg($_botchan,"- > Redéfinition des utilisateurs");	
+		  $_Octopus->msg($_botchan,"- > Version du service : ".$_version);	
+		  $_Octopus->msg($_botchan,"");
 		  sleep(1);
-		  $Octopus->msg($this->{chan},"");
-		  $Octopus->msg($this->{chan},"================ Octopus IRC Service ================");	
-    	  $Octopus->msg($this->{chan},"RELOAD : ".$nick." -> rechargement terminé...");	
-    	  $Octopus->notice($nick,"RELOAD : ".$nick." -> rechargement terminé...");	
+		  $_Octopus->msg($_botchan,"");
+		  $_Octopus->msg($_botchan,"================ Octopus IRC Service ================");	
+    	  $_Octopus->msg($_botchan,"RELOAD : ".$nick." -> rechargement terminé...");	
+    	  $_Octopus->notice($nick,"RELOAD : ".$nick." -> rechargement terminé...");	
     	  print "Reload complete.\n";
 		}
 		else {
-			$Octopus->notice($nick,"Erreur : commande inconnue - Pour obtenir de l'aide, saisir : /msg $this->{nick} HELP");	
+			$_Octopus->notice($nick,"Erreur : commande inconnue - Pour obtenir de l'aide, saisir : /msg $_Octopus->{nick} HELP");	
 		}            
 	}
 };
 
-1;
+	1;
