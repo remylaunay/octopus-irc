@@ -17,7 +17,7 @@ our ( $_botuid, $_serv, $_pass, $_addr, $_port, $_desc, $_sid, $_botnick, $_botu
 
 # Initialisation #
 sub init{
-	our ( $_class, $_serv, $_pass, $_addr, $_port, $_desc, $_sid, $_botnick, $_botuser, $_bothost, $_botname, $_botchan, $_sqlhost, $_sqlport, $_sqllogin, $_sqlpass, $_sqldb ) = @_;
+	( $_serv, $_pass, $_addr, $_port, $_desc, $_sid, $_botnick, $_botuser, $_bothost, $_botname, $_botchan, $_sqlhost, $_sqlport, $_sqllogin, $_sqlpass, $_sqldb ) = @_;
 	our $_ip = inet_ntoa(inet_aton($_addr));
 	our $_state = 0;
 	our $_eaddr = `ruby base64 $_ip`;
@@ -33,12 +33,12 @@ sub init{
 	$_botuid .= $_letters[rand($#_letters)] for (1..4);
 	$_botuid .= $_figures[rand($#_figures)] for (1..2);
 
-	our $_botuid = $_sid.$_botuid;
+	$_botuid = $_sid.$_botuid;
 	our $_mySQL = DBI->connect("DBI:mysql:database=$_sqldb;host=$_sqlhost;port=$_sqlport", $_sqllogin, $_sqlpass);
 	our $_Octopus = Octopus->config();
 
 	print $_sockID "PASS :$_pass\r\n";
-	print $_sockID "PROTOCTL EAUTH=octopus.khalia-dev.fr SID=$_sid\r\n";
+	print $_sockID "PROTOCTL EAUTH=$_serv SID=$_sid\r\n";
 	print $_sockID "PROTOCTL NOQUIT NICKv2 SJOIN SJ3 CLK TKLEXT TKLEXT2 NICKIP ESVID MLOCK EXTSWHOIS\r\n";
 	print $_sockID "SERVER $_serv 1 :$_desc\r\n";
 	print $_sockID ":$_sid EOS\r\n";
