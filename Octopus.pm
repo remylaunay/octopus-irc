@@ -2,24 +2,24 @@
 package Octopus;
 use strict;
 use warnings;
-use DBI;
 use Switch;
+use IO::Socket;
 
 sub config {
-	my ( $class, $sid, $nick, $user, $host, $name, $chan, $uid, $eaddr, $sockID ) = @_;
-	$eaddr =~ s/\n//gs;
+	my ( $class ) = @_;
+	$Service::_eaddr =~ s/\n//gs;
 	$class = ref($class) || $class;
 	my $this = {
-	  "sid"    => $sid,
-	  "eaddr" => $eaddr,
-	  "nick"    => $nick,
-	  "user" => $user,
-	  "host"    => $host,
-	  "name"    => $name,
-	  "chan"  => $chan,
-	  "uid"    => $uid,
-	  "sockID" => $sockID,
-	  "mySQL" => DBI->connect("DBI:mysql:database=octopus", "*****", "*******") 
+	  "sid"    => $Service::_sid,
+	  "eaddr" => $Service::_eaddr,
+	  "nick"    => $Service::_botnick,
+	  "user" => $Service::_botuser,
+	  "host"    => $Service::_bothost,
+	  "name"    => $Service::_botname,
+	  "chan"  => $Service::_botchan,
+	  "uid"    => $Service::_botuid,
+	  "sockID" => $Service::_sockID,
+	  "mySQL" => $Service::_mySQL
 	};
 	
 	bless ($this, $class);
