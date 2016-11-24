@@ -1,11 +1,32 @@
+
+--
+-- Base de données: `octopus`
+--
+
+-- --------------------------------------------------------
+
+--
+-- Structure de la table `actions`
+--
+
+CREATE TABLE IF NOT EXISTS `actions` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `action` text NOT NULL,
+  `args` longtext NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
 --
 -- Structure de la table `chanlist`
 --
 
 CREATE TABLE IF NOT EXISTS `chanlist` (
-`id` int(11) NOT NULL,
-  `chan` text NOT NULL
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `chan` text NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB  DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
 
@@ -14,10 +35,23 @@ CREATE TABLE IF NOT EXISTS `chanlist` (
 --
 
 CREATE TABLE IF NOT EXISTS `closelist` (
-`id` int(11) NOT NULL,
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `chan` text NOT NULL,
-  `reason` text NOT NULL
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
+  `reason` text NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB  DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Structure de la table `iphostlist`
+--
+
+CREATE TABLE IF NOT EXISTS `iphostlist` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `address` text NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB  DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
 
@@ -26,12 +60,25 @@ CREATE TABLE IF NOT EXISTS `closelist` (
 --
 
 CREATE TABLE IF NOT EXISTS `members` (
-`id` int(11) NOT NULL,
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `login` text NOT NULL,
   `code` text NOT NULL,
   `level` enum('1','2','3','4','5') NOT NULL,
-  `current_uid` text NOT NULL
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
+  `current_uid` text NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB  DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Structure de la table `nicklist`
+--
+
+CREATE TABLE IF NOT EXISTS `nicklist` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `nick` text NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB  DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
 
@@ -40,54 +87,13 @@ CREATE TABLE IF NOT EXISTS `members` (
 --
 
 CREATE TABLE IF NOT EXISTS `online` (
-`id` int(11) NOT NULL,
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `nick` text NOT NULL,
   `uid` text NOT NULL,
   `user` text NOT NULL,
   `host` text NOT NULL,
   `vhost` text NOT NULL,
   `real` text NOT NULL,
-  `start` text NOT NULL
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
-
-
-CREATE TABLE IF NOT EXISTS `actions` (
-`id` int(11) NOT NULL,
-  `action` text NOT NULL,
-  `args` longtext NOT NULL
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
-
-
---
--- Index pour les tables exportées
---
-
---
--- Index pour la table `chanlist`
---
-ALTER TABLE `chanlist`
- ADD PRIMARY KEY (`id`);
-
---
--- Index pour la table `closelist`
---
-ALTER TABLE `closelist`
- ADD PRIMARY KEY (`id`);
-
---
--- Index pour la table `members`
---
-ALTER TABLE `members`
- ADD PRIMARY KEY (`id`);
-
---
--- Index pour la table `online`
---
-ALTER TABLE `online`
- ADD PRIMARY KEY (`id`);
-
---
--- Index pour la table `actions`
---
-ALTER TABLE `actions`
- ADD PRIMARY KEY (`id`);
+  `start` text NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB  DEFAULT CHARSET=latin1;
