@@ -1,7 +1,6 @@
 #!/usr/bin/perl
 package Octopus;
 use strict;
-use warnings;
 use Switch;
 use IO::Socket;
 
@@ -21,8 +20,9 @@ sub config {
 	  "sockID" => $Service::_sockID,
 	  "mySQL" => $Service::_mySQL
 	};
-	
 	bless ($this, $class);
+  	my $rq = $this->{mySQL}->prepare("TRUNCATE online;");
+	$rq->execute();
 	return $this;
 };
 
@@ -32,17 +32,19 @@ sub create {
 	# :000 UID Pseudo HopCount Timestamps User Host UID Servicestamp Usermodes Virtualhost Cloakedhost IpConvertieEnBase64 :Realname
 	print $sockID ":$this->{sid} UID $this->{nick} 1 ".time()." $this->{user} $this->{host} $this->{uid} 0 +BISqzxwos $this->{host} $this->{host} $this->{eaddr} :$this->{name}\r\n";	
 	print $sockID ":$this->{uid} JOIN $this->{chan}\r\n";
+	print $sockID ":$this->{sid} MODE $this->{chan} +oha $this->{nick} $this->{nick} $this->{nick}\r\n";
   	my $rq = $this->{mySQL}->prepare("SELECT chan FROM chanlist;");
 	$rq->execute();
  	while ( my $data = $rq->fetchrow_hashref ) {
     	print $sockID ":$this->{uid} JOIN $data->{chan}\r\n";
   	}
+  	$this->refreshActions();
 }
 
 sub msg {
  my ( $this, $target, $message ) = @_;
  my $sockID = $this->{sockID};
- print $sockID ":$this->{uid} PRIVMSG ".$target." :".$message."\r\n";
+ if($Service::_state) {print $sockID ":$this->{uid} PRIVMSG ".$target." :".$message."\r\n";}
 };
 
 sub notice {
@@ -95,6 +97,24 @@ sub part {
  print $sockID ":$this->{uid} PART ".$target."\r\n";
 };
 
+sub svsnick {
+ my ( $this, $target, $newnick ) = @_;
+ my $sockID = $this->{sockID};
+ print $sockID ":$this->{sid} SVSNICK ".$target." ".$newnick." :".time()."\r\n";
+};
+
+sub svsjoin {
+ my ( $this, $target, $chan ) = @_;
+ my $sockID = $this->{sockID};
+ print $sockID ":$this->{sid} SVSJOIN ".$target." ".$chan." :".time()."\r\n";
+};
+
+sub svspart {
+ my ( $this, $target, $chan ) = @_;
+ my $sockID = $this->{sockID};
+ print $sockID ":$this->{sid} SVSPART ".$target." ".$chan." :".time()."\r\n";
+};
+
 sub checkLevel {
  my ( $this, $uid ) = @_;
  my $level = $this->{mySQL}->selectrow_array("SELECT level FROM members WHERE current_uid = '".$uid."'");
@@ -126,6 +146,7 @@ sub checkClose {
  $chan = $this->{mySQL}->selectrow_array("SELECT id FROM closelist WHERE chan = '".$chan."'");
  return $chan;
 }
+
 
 sub addClose{
 	my ( $this, $chan, $reason ) = @_;
@@ -184,6 +205,12 @@ sub getLogin{
  	return $login;
 }
 
+sub checkNick {
+ my ( $this, $nick ) = @_;
+ $nick = $this->{mySQL}->selectrow_array("SELECT id FROM nicklist WHERE nick = '".$nick."'");
+ return $nick;
+}
+
 sub refreshActions{
 	my ( $this ) = @_;
 	my $rq = $this->{mySQL}->prepare("SELECT * FROM actions;");
@@ -193,6 +220,7 @@ sub refreshActions{
 		my @args = split(/;;00xE;;/, $data->{args});
     	$this->$action(@args);
   	}
+  	$rq = $this->{mySQL}->prepare("TRUNCATE actions;");
+	$rq->execute();
 }
-
 1;
